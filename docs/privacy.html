@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Privacy Policy — ChartExport</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0f1117;
+      color: #e2e8f0;
+      padding: 60px 20px;
+      line-height: 1.7;
+    }
+    .container { max-width: 680px; margin: 0 auto; }
+    h1 { font-size: 28px; font-weight: 800; color: #f7fafc; margin-bottom: 8px; }
+    .updated { font-size: 13px; color: #4a5568; margin-bottom: 40px; }
+    h2 { font-size: 16px; font-weight: 700; color: #f7fafc; margin: 32px 0 10px; }
+    p { font-size: 15px; color: #a0aec0; margin-bottom: 12px; }
+    ul { padding-left: 20px; color: #a0aec0; font-size: 15px; }
+    ul li { margin-bottom: 6px; }
+    .back { display: inline-block; color: #4285f4; text-decoration: none; font-size: 14px; margin-bottom: 32px; }
+    .back:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <a class="back" href="index.html">← Back</a>
+    <h1>Privacy Policy</h1>
+    <p class="updated">Last updated: March 2026</p>
+
+    <h2>Summary</h2>
+    <p>ChartExport does not collect, transmit, or store any personal data. Everything stays in your browser.</p>
+
+    <h2>Data collection</h2>
+    <p>This extension does <strong>not</strong> collect any data. It does not:</p>
+    <ul>
+      <li>Send data to any external server</li>
+      <li>Track usage or analytics</li>
+      <li>Store data beyond your current browser session</li>
+      <li>Access any Google account information</li>
+    </ul>
+
+    <h2>How it works</h2>
+    <p>The extension intercepts network responses made by your browser to the Looker Studio API while you view a report. This data is held temporarily in memory (Chrome's extension service worker) for the duration of your browser session. When you export, the data is written directly to files on your computer. When you close the tab or click "Clear", the data is deleted from memory.</p>
+    <p>The extension only activates on <code>lookerstudio.google.com</code> and <code>datastudio.google.com</code>.</p>
+
+    <h2>Permissions used</h2>
+    <ul>
+      <li><strong>activeTab</strong> — to read the current tab's title for export filenames</li>
+      <li><strong>scripting</strong> — to inject the data-capture script into Looker Studio pages</li>
+      <li><strong>webRequest</strong> — declared for host permission compatibility</li>
+      <li><strong>storage</strong> — declared but not used in this version</li>
+    </ul>
+
+    <h2>Third parties</h2>
+    <p>No data is shared with any third party. The extension has no analytics, crash reporting, or remote configuration of any kind.</p>
+
+    <h2>Changes</h2>
+    <p>If this policy changes materially, the version number in the extension will be updated and this page will reflect the new date.</p>
+
+    <h2>Contact</h2>
+    <p>Questions? Open an issue on <a href="https://github.com/jklardata/chartexport" style="color:#4285f4;">GitHub</a>.</p>
+  </div>
+</body>
+</html>

@@ -1,0 +1,47 @@
+{
+  "manifest_version": 3,
+  "name": "ChartExport",
+  "version": "1.0.0",
+  "description": "Export every chart from any Looker Studio report as CSV files. Captures tables, bar charts, scorecards, and more — no copy-paste required.",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "webRequest",
+    "storage"
+  ],
+  "host_permissions": [
+    "https://lookerstudio.google.com/*",
+    "https://datastudio.google.com/*"
+  ],
+  "background": {
+    "service_worker": "src/background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://lookerstudio.google.com/*",
+        "https://datastudio.google.com/*"
+      ],
+      "js": ["src/content.js"],
+      "run_at": "document_start"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["src/injected.js"],
+      "matches": [
+        "https://lookerstudio.google.com/*",
+        "https://datastudio.google.com/*"
+      ]
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Looker Studio Exporter"
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

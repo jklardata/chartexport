@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ChartExport — Export Looker Studio charts as CSV</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0f1117;
+      color: #e2e8f0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 20px;
+    }
+    .container { max-width: 600px; width: 100%; text-align: center; }
+    .logo {
+      width: 64px; height: 64px;
+      background: linear-gradient(135deg, #4285f4, #0f9d58);
+      border-radius: 16px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 32px;
+      margin: 0 auto 24px;
+    }
+    h1 { font-size: 36px; font-weight: 800; color: #f7fafc; margin-bottom: 12px; }
+    .tagline { font-size: 18px; color: #a0aec0; margin-bottom: 40px; line-height: 1.5; }
+    .features { text-align: left; margin-bottom: 40px; }
+    .feature {
+      display: flex; align-items: flex-start; gap: 12px;
+      padding: 14px 0; border-bottom: 1px solid #1a1d27;
+    }
+    .feature:last-child { border-bottom: none; }
+    .feature-icon { font-size: 20px; flex-shrink: 0; margin-top: 2px; }
+    .feature-text strong { display: block; color: #f7fafc; margin-bottom: 2px; }
+    .feature-text span { font-size: 14px; color: #718096; }
+    .cta {
+      display: inline-block;
+      background: #4285f4;
+      color: white;
+      padding: 14px 32px;
+      border-radius: 8px;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 16px;
+      margin-bottom: 16px;
+    }
+    .cta:hover { background: #3b7de8; }
+    .footer { margin-top: 48px; font-size: 13px; color: #4a5568; }
+    .footer a { color: #718096; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="logo">📊</div>
+    <h1>ChartExport</h1>
+    <p class="tagline">Export every chart from any Looker Studio report as CSV files.<br>No copy-paste. No manual work.</p>
+
+    <div class="features">
+      <div class="feature">
+        <div class="feature-icon">⚡</div>
+        <div class="feature-text">
+          <strong>Captures all chart types</strong>
+          <span>Tables, bar charts, pie charts, scorecards — all exported with real column headers.</span>
+        </div>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">📄</div>
+        <div class="feature-text">
+          <strong>Multi-page reports</strong>
+          <span>Click "All Pages" to automatically navigate every page and capture all data.</span>
+        </div>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">🔢</div>
+        <div class="feature-text">
+          <strong>Fetch all rows</strong>
+          <span>Break past display limits — get all rows, not just the top 10 shown in the chart.</span>
+        </div>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">🔒</div>
+        <div class="feature-text">
+          <strong>100% private</strong>
+          <span>No data leaves your browser. Nothing is sent to any server.</span>
+        </div>
+      </div>
+    </div>
+
+    <a class="cta" href="https://chrome.google.com/webstore" target="_blank">Add to Chrome — It's Free</a>
+
+    <div class="footer">
+      <a href="privacy.html">Privacy Policy</a>
+    </div>
+  </div>
+</body>
+</html>
