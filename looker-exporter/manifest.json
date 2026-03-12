@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "ChartExport",
   "version": "1.0.0",
-  "description": "Export every chart from any Looker Studio report as CSV files. Captures tables, bar charts, scorecards, and more — no copy-paste required.",
+  "description": "Export every chart from any Looker Studio report as CSV. Tables, bar charts, scorecards and more — no copy-paste required.",
   "permissions": [
     "activeTab",
     "scripting",
