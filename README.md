@@ -44,7 +44,7 @@ Looker Studio fetches chart data via a `batchedDataV2` API endpoint. ChartExport
 - `background.js` — stores captured chart data per tab
 - `popup.js` — renders the chart list and handles CSV/ZIP export
 
-For a full technical breakdown, see [LOOKER_EXPORTER_HANDOFF.md](LOOKER_EXPORTER_HANDOFF.md).
+For a full technical breakdown, see [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Package for distribution
 
