@@ -1,8 +1,8 @@
-# ChartExport
+# Looker Studio Exporter
 
 A Chrome extension that exports every chart from any Looker Studio report as CSV files.
 
-Looker Studio doesn't have a bulk data export. ChartExport intercepts the report's API traffic and captures chart data as it loads — no scraping, no copy-paste, no manual work.
+Looker Studio doesn't have a bulk data export. Looker Studio Exporter intercepts the report's API traffic and captures chart data as it loads — no scraping, no copy-paste, no manual work.
 
 **[Install from Chrome Web Store](#)** · [Privacy Policy](https://jklardata.github.io/chartexport/privacy.html)
 
@@ -20,7 +20,7 @@ Looker Studio doesn't have a bulk data export. ChartExport intercepts the report
 ## How to use
 
 1. Open a Looker Studio report you have editor or owner access to
-2. Click the ChartExport icon in your toolbar — charts appear in the list as data loads
+2. Click the Looker Studio Exporter icon in your toolbar — charts appear in the list as data loads
 3. Select the charts you want and click **Export CSV**
 
 For multi-page reports, click **All Pages** to capture all pages automatically.
@@ -37,7 +37,7 @@ To get all rows for a chart (not just the display limit), click **↓ all** next
 
 ## How it works
 
-Looker Studio fetches chart data via a `batchedDataV2` API endpoint. ChartExport intercepts these requests and responses using a three-layer content script pattern required by Chrome's Manifest V3:
+Looker Studio fetches chart data via a `batchedDataV2` API endpoint. Looker Studio Exporter intercepts these requests and responses using a three-layer content script pattern required by Chrome's Manifest V3:
 
 - `content.js` — injects `injected.js` into the page context and relays data to the background
 - `injected.js` — runs in the page's JS context, overrides `window.fetch` and `XMLHttpRequest`, resolves obfuscated column names to human-readable headers using the `getSchema` + request body lookup chain
