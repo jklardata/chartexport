@@ -1,8 +1,83 @@
 // popup.js — handles UI interactions, fetches charts from background, exports ZIP
 
+const API_BASE = 'https://looker-exporter-checkout.vercel.app'; // update after deploy
+const FREE_LIMIT = 3;
+
 let charts = [];
 let selectedIds = new Set();
 let reportName = '';
+let isPro = false;
+
+// ─── License & Usage ──────────────────────────────────────────────────
+
+async function getLicense() {
+  return new Promise(resolve => chrome.storage.local.get(['license'], r => resolve(r.license || null)));
+}
+
+async function getUsage() {
+  return new Promise(resolve => chrome.storage.local.get(['usage'], r => resolve(r.usage || { count: 0, month: '' })));
+}
+
+async function setUsage(usage) {
+  return new Promise(resolve => chrome.storage.local.set({ usage }, resolve));
+}
+
+function currentMonth() {
+  return new Date().toISOString().slice(0, 7); // 'YYYY-MM'
+}
+
+async function checkPro() {
+  const license = await getLicense();
+  if (!license?.key) return false;
+
+  // Re-validate at most once per 24h
+  const now = Date.now();
+  if (license.validatedAt && now - license.validatedAt < 24 * 60 * 60 * 1000) {
+    return license.active === true;
+  }
+
+  try {
+    const res = await fetch(`${API_BASE}/api/validate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: license.key })
+    });
+    const data = await res.json();
+    await new Promise(resolve => chrome.storage.local.set({
+      license: { ...license, active: data.valid, validatedAt: now }
+    }, resolve));
+    return data.valid === true;
+  } catch {
+    // Offline: trust cached active status
+    return license.active === true;
+  }
+}
+
+async function canExport() {
+  if (isPro) return { allowed: true };
+
+  let usage = await getUsage();
+  const month = currentMonth();
+  if (usage.month !== month) {
+    usage = { count: 0, month };
+    await setUsage(usage);
+  }
+
+  if (usage.count >= FREE_LIMIT) {
+    return { allowed: false, count: usage.count };
+  }
+  return { allowed: true, count: usage.count };
+}
+
+async function recordExport() {
+  if (isPro) return;
+  let usage = await getUsage();
+  const month = currentMonth();
+  if (usage.month !== month) usage = { count: 0, month };
+  usage.count += 1;
+  await setUsage(usage);
+  updateUsageBadge(usage.count);
+}
 
 // ─── Utilities ────────────────────────────────────────────────────────
 
@@ -50,16 +125,12 @@ function toCSV(columns, rows) {
 }
 
 // ─── ZIP builder (no external deps) ──────────────────────────────────
-// Minimal ZIP implementation using DeflateRaw via CompressionStream API
 
 async function buildZip(files) {
-  // files: [{ name, content (string) }]
-  // Uses stored (no compression) for simplicity — works in all Chrome versions
-
   const encoder = new TextEncoder();
   const localHeaders = [];
-  const centralDirectory = [];
   let offset = 0;
+  const parts = [];
 
   const uint32LE = n => new Uint8Array([n & 0xff, (n >> 8) & 0xff, (n >> 16) & 0xff, (n >> 24) & 0xff]);
   const uint16LE = n => new Uint8Array([n & 0xff, (n >> 8) & 0xff]);
@@ -79,28 +150,16 @@ async function buildZip(files) {
     return (crc ^ 0xFFFFFFFF) >>> 0;
   }
 
-  const parts = [];
-
   for (const file of files) {
     const nameBytes = encoder.encode(file.name);
     const dataBytes = encoder.encode(file.content);
     const crc = crc32(dataBytes);
     const size = dataBytes.length;
 
-    // Local file header
     const localHeader = new Uint8Array([
-      0x50, 0x4B, 0x03, 0x04, // signature
-      0x14, 0x00,              // version needed
-      0x00, 0x00,              // flags
-      0x00, 0x00,              // compression (stored)
-      0x00, 0x00,              // mod time
-      0x00, 0x00,              // mod date
-      ...uint32LE(crc),
-      ...uint32LE(size),
-      ...uint32LE(size),
-      ...uint16LE(nameBytes.length),
-      0x00, 0x00,              // extra field length
-      ...nameBytes
+      0x50, 0x4B, 0x03, 0x04, 0x14, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+      ...uint32LE(crc), ...uint32LE(size), ...uint32LE(size),
+      ...uint16LE(nameBytes.length), 0x00, 0x00, ...nameBytes
     ]);
 
     localHeaders.push({ nameBytes, crc, size, offset });
@@ -109,58 +168,107 @@ async function buildZip(files) {
     offset += localHeader.length + dataBytes.length;
   }
 
-  // Central directory
   let cdOffset = offset;
   for (let i = 0; i < files.length; i++) {
     const { nameBytes, crc, size, offset: fileOffset } = localHeaders[i];
     const cdEntry = new Uint8Array([
-      0x50, 0x4B, 0x01, 0x02, // signature
-      0x14, 0x00,              // version made by
-      0x14, 0x00,              // version needed
-      0x00, 0x00,              // flags
-      0x00, 0x00,              // compression
-      0x00, 0x00,              // mod time
-      0x00, 0x00,              // mod date
-      ...uint32LE(crc),
-      ...uint32LE(size),
-      ...uint32LE(size),
-      ...uint16LE(nameBytes.length),
-      0x00, 0x00,              // extra length
-      0x00, 0x00,              // comment length
-      0x00, 0x00,              // disk start
-      0x00, 0x00,              // internal attrs
-      0x00, 0x00, 0x00, 0x00, // external attrs
-      ...uint32LE(fileOffset),
-      ...nameBytes
+      0x50, 0x4B, 0x01, 0x02, 0x14, 0x00, 0x14, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+      ...uint32LE(crc), ...uint32LE(size), ...uint32LE(size),
+      ...uint16LE(nameBytes.length), 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+      ...uint32LE(fileOffset), ...nameBytes
     ]);
     parts.push(cdEntry);
     offset += cdEntry.length;
   }
 
   const cdSize = offset - cdOffset;
-
-  // End of central directory
   const eocd = new Uint8Array([
-    0x50, 0x4B, 0x05, 0x06,
-    0x00, 0x00,
-    0x00, 0x00,
-    ...uint16LE(files.length),
-    ...uint16LE(files.length),
-    ...uint32LE(cdSize),
-    ...uint32LE(cdOffset),
-    0x00, 0x00
+    0x50, 0x4B, 0x05, 0x06, 0x00, 0x00, 0x00, 0x00,
+    ...uint16LE(files.length), ...uint16LE(files.length),
+    ...uint32LE(cdSize), ...uint32LE(cdOffset), 0x00, 0x00
   ]);
   parts.push(eocd);
 
-  // Combine all parts
   const total = parts.reduce((acc, p) => acc + p.length, 0);
   const result = new Uint8Array(total);
   let pos = 0;
-  for (const part of parts) {
-    result.set(part, pos);
-    pos += part.length;
-  }
+  for (const part of parts) { result.set(part, pos); pos += part.length; }
   return result;
+}
+
+// ─── Usage Badge ──────────────────────────────────────────────────────
+
+function updateUsageBadge(count) {
+  const badge = document.getElementById('usageBadge');
+  if (!badge) return;
+  if (isPro) {
+    badge.textContent = 'Pro — unlimited exports';
+    badge.className = 'usage-badge pro';
+  } else {
+    const remaining = Math.max(0, FREE_LIMIT - count);
+    badge.textContent = `${remaining} free export${remaining !== 1 ? 's' : ''} left this month`;
+    badge.className = `usage-badge ${remaining === 0 ? 'empty' : ''}`;
+  }
+}
+
+// ─── Paywall ──────────────────────────────────────────────────────────
+
+function showPaywall() {
+  document.getElementById('paywallOverlay').style.display = 'flex';
+}
+
+function hidePaywall() {
+  document.getElementById('paywallOverlay').style.display = 'none';
+}
+
+function showLicenseEntry() {
+  document.getElementById('paywallOverlay').style.display = 'none';
+  document.getElementById('licenseOverlay').style.display = 'flex';
+}
+
+function hideLicenseEntry() {
+  document.getElementById('licenseOverlay').style.display = 'none';
+}
+
+async function activateLicense() {
+  const input = document.getElementById('licenseInput');
+  const key = input.value.trim();
+  const btn = document.getElementById('activateBtn');
+  const err = document.getElementById('licenseError');
+
+  if (!key) return;
+
+  btn.disabled = true;
+  btn.textContent = 'Checking...';
+  err.style.display = 'none';
+
+  try {
+    const res = await fetch(`${API_BASE}/api/validate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key })
+    });
+    const data = await res.json();
+
+    if (data.valid) {
+      await new Promise(resolve => chrome.storage.local.set({
+        license: { key, active: true, plan: data.plan, email: data.email, validatedAt: Date.now() }
+      }, resolve));
+      isPro = true;
+      hideLicenseEntry();
+      updateUsageBadge(0);
+      showToast('✓ Pro activated!');
+    } else {
+      err.textContent = 'Invalid or expired license key.';
+      err.style.display = 'block';
+    }
+  } catch {
+    err.textContent = 'Could not connect. Check your internet and try again.';
+    err.style.display = 'block';
+  }
+
+  btn.disabled = false;
+  btn.textContent = 'Activate';
 }
 
 // ─── UI ───────────────────────────────────────────────────────────────
@@ -205,7 +313,6 @@ function renderCharts() {
     </div>
   `).join('');
 
-  // Bind checkboxes
   list.querySelectorAll('input[type="checkbox"]').forEach((cb, i) => {
     cb.addEventListener('change', () => {
       if (cb.checked) selectedIds.add(i);
@@ -214,16 +321,13 @@ function renderCharts() {
     });
   });
 
-  // Bind fetch-all links
   list.querySelectorAll('.fetch-all-link').forEach(el => {
     el.addEventListener('click', async (e) => {
       e.stopPropagation();
       const chart = charts[parseInt(el.dataset.index)];
       if (!chart?.componentId) return;
-
       el.textContent = '⟳';
       el.style.pointerEvents = 'none';
-
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       ensureContentScript(tab.id, (ready) => {
         if (!ready) { el.textContent = '↓ all'; el.style.pointerEvents = ''; return; }
@@ -242,7 +346,6 @@ async function loadCharts() {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (!tab) return;
 
-  // Extract report name from tab title — strip " - Looker Studio" suffix
   reportName = (tab.title || '')
     .replace(/\s*[-–]\s*(Looker Studio|Google Data Studio|Data Studio)\s*$/i, '')
     .trim();
@@ -260,13 +363,18 @@ document.getElementById('exportBtn').addEventListener('click', async () => {
   const toExport = charts.filter((_, i) => selectedIds.has(i));
   if (toExport.length === 0) return;
 
+  const check = await canExport();
+  if (!check.allowed) {
+    showPaywall();
+    return;
+  }
+
   const exportBtn = document.getElementById('exportBtn');
   exportBtn.textContent = 'Building...';
   exportBtn.disabled = true;
 
   try {
     if (toExport.length === 1) {
-      // Single file — just download CSV directly
       const chart = toExport[0];
       const csv = toCSV(chart.columns, chart.rows);
       const blob = new Blob([csv], { type: 'text/csv' });
@@ -278,23 +386,15 @@ document.getElementById('exportBtn').addEventListener('click', async () => {
       URL.revokeObjectURL(url);
       showToast('✓ CSV downloaded');
     } else {
-      // Multiple files — ZIP
       const files = toExport.map(chart => ({
         name: `${makeFilename(chart.title)}.csv`,
         content: toCSV(chart.columns, chart.rows)
       }));
-
-      // Deduplicate filenames
       const seen = {};
       files.forEach(f => {
-        if (seen[f.name]) {
-          seen[f.name]++;
-          f.name = f.name.replace('.csv', `_${seen[f.name]}.csv`);
-        } else {
-          seen[f.name] = 1;
-        }
+        if (seen[f.name]) { seen[f.name]++; f.name = f.name.replace('.csv', `_${seen[f.name]}.csv`); }
+        else seen[f.name] = 1;
       });
-
       const zipBytes = await buildZip(files);
       const blob = new Blob([zipBytes], { type: 'application/zip' });
       const url = URL.createObjectURL(blob);
@@ -305,6 +405,8 @@ document.getElementById('exportBtn').addEventListener('click', async () => {
       URL.revokeObjectURL(url);
       showToast(`✓ ${files.length} CSVs exported as ZIP`);
     }
+
+    await recordExport();
   } catch (e) {
     showToast('Export failed — check console');
     console.error(e);
@@ -340,7 +442,6 @@ document.getElementById('selectAllBtn').addEventListener('click', () => {
     document.getElementById('selectAllBtn').textContent = 'Deselect all';
   }
   renderCharts();
-  // Re-sync checkboxes
   document.querySelectorAll('input[type="checkbox"]').forEach((cb, i) => {
     cb.checked = selectedIds.has(i);
   });
@@ -351,15 +452,9 @@ document.getElementById('selectAllBtn').addEventListener('click', () => {
 
 let capturePolling = null;
 
-// Pings the content script. If it doesn't respond (old version or not yet injected),
-// re-injects content.js so the CAPTURE_ALL_PAGES handler is available.
 function ensureContentScript(tabId, callback) {
   chrome.tabs.sendMessage(tabId, { type: 'PING' }, (response) => {
-    if (!chrome.runtime.lastError && response?.pong) {
-      callback(true);
-      return;
-    }
-    // Content script is stale or missing — re-inject
+    if (!chrome.runtime.lastError && response?.pong) { callback(true); return; }
     chrome.scripting.executeScript({ target: { tabId }, files: ['src/content.js'] }, () => {
       if (chrome.runtime.lastError) { callback(false); return; }
       setTimeout(() => callback(true), 150);
@@ -370,16 +465,10 @@ function ensureContentScript(tabId, callback) {
 document.getElementById('captureAllBtn').addEventListener('click', async () => {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (!tab) return;
-
   const btn = document.getElementById('captureAllBtn');
   btn.disabled = true;
-
   ensureContentScript(tab.id, (ready) => {
-    if (!ready) {
-      showToast('Could not inject script — reload the Looker Studio report');
-      btn.disabled = false;
-      return;
-    }
+    if (!ready) { showToast('Could not inject script — reload the Looker Studio report'); btn.disabled = false; return; }
     chrome.tabs.sendMessage(tab.id, { type: 'CAPTURE_ALL_PAGES' }, (response) => {
       if (chrome.runtime.lastError || !response?.started) {
         showToast('Could not start capture — reload the Looker Studio report');
@@ -400,19 +489,16 @@ function startCapturePolling(tabId) {
 
   captureBar.style.display = 'block';
   statusDot.classList.remove('inactive');
-
   if (capturePolling) clearInterval(capturePolling);
 
   capturePolling = setInterval(() => {
     chrome.runtime.sendMessage({ type: 'GET_CAPTURE_PROGRESS', tabId }, (progress) => {
       if (!progress) return;
-
       if (progress.status === 'capturing') {
         const pct = Math.round((progress.currentPage / progress.totalPages) * 100);
         captureBarFill.style.width = pct + '%';
         statusText.textContent = `Capturing page ${progress.currentPage} of ${progress.totalPages}...`;
       }
-
       if (progress.status === 'done') {
         clearInterval(capturePolling);
         capturePolling = null;
@@ -425,7 +511,6 @@ function startCapturePolling(tabId) {
           showToast(`✓ All ${progress.totalPages} pages captured`);
         }, 500);
       }
-
       if (progress.status === 'error') {
         clearInterval(capturePolling);
         capturePolling = null;
@@ -438,4 +523,14 @@ function startCapturePolling(tabId) {
 }
 
 // ─── Init ─────────────────────────────────────────────────────────────
-loadCharts();
+
+async function init() {
+  isPro = await checkPro();
+  const usage = await getUsage();
+  const month = currentMonth();
+  const count = usage.month === month ? usage.count : 0;
+  updateUsageBadge(count);
+  loadCharts();
+}
+
+init();

@@ -229,6 +229,87 @@
     }
 
     .toast.show { opacity: 1; }
+
+    /* ── USAGE BADGE ── */
+    .usage-badge {
+      padding: 5px 16px;
+      font-size: 11px;
+      color: #718096;
+      background: #161926;
+      border-bottom: 1px solid #1a1d27;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .usage-badge.empty { color: #f6ad55; }
+    .usage-badge.pro { color: #68d391; }
+    .usage-badge .upgrade-link {
+      color: #4285f4;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    .usage-badge .upgrade-link:hover { text-decoration: underline; }
+
+    /* ── OVERLAYS ── */
+    .overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(10,12,20,0.92);
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      z-index: 100;
+    }
+    .overlay-card {
+      background: #1a1d27;
+      border: 1px solid #2d3748;
+      border-radius: 12px;
+      padding: 24px 20px;
+      width: 100%;
+      text-align: center;
+    }
+    .overlay-card h2 { font-size: 16px; font-weight: 700; color: #f7fafc; margin-bottom: 6px; }
+    .overlay-card p { font-size: 12px; color: #718096; margin-bottom: 16px; line-height: 1.5; }
+    .plan-row { display: flex; gap: 8px; margin-bottom: 12px; }
+    .plan-opt {
+      flex: 1; border: 1.5px solid #2d3748; border-radius: 8px; padding: 10px 8px;
+      cursor: pointer; transition: border-color 0.15s;
+    }
+    .plan-opt:hover { border-color: #4285f4; }
+    .plan-opt-label { font-size: 10px; font-weight: 700; text-transform: uppercase; color: #718096; margin-bottom: 2px; }
+    .plan-opt-price { font-size: 17px; font-weight: 800; color: #f7fafc; }
+    .plan-opt-price span { font-size: 11px; font-weight: 400; color: #718096; }
+    .plan-opt-save { font-size: 10px; color: #68d391; font-weight: 600; margin-top: 2px; }
+    .btn-upgrade {
+      width: 100%; padding: 10px; background: #4285f4; color: white;
+      border: none; border-radius: 8px; font-size: 13px; font-weight: 600;
+      cursor: pointer; margin-bottom: 8px; transition: background 0.15s;
+    }
+    .btn-upgrade:hover { background: #3b7de8; }
+    .overlay-footer { font-size: 11px; color: #4a5568; }
+    .overlay-footer a { color: #718096; cursor: pointer; }
+    .overlay-footer a:hover { color: #a0aec0; }
+    .overlay-close {
+      position: absolute; top: 12px; right: 14px;
+      font-size: 18px; color: #4a5568; cursor: pointer; line-height: 1;
+    }
+    .overlay-close:hover { color: #a0aec0; }
+    .license-input {
+      width: 100%; padding: 8px 12px; background: #0f1117;
+      border: 1.5px solid #2d3748; border-radius: 8px; color: #e2e8f0;
+      font-family: monospace; font-size: 12px; margin-bottom: 8px; outline: none;
+    }
+    .license-input:focus { border-color: #4285f4; }
+    .license-error { font-size: 11px; color: #fc8181; margin-bottom: 8px; display: none; }
+    .btn-activate {
+      width: 100%; padding: 10px; background: #4285f4; color: white;
+      border: none; border-radius: 8px; font-size: 13px; font-weight: 600;
+      cursor: pointer; transition: background 0.15s;
+    }
+    .btn-activate:hover:not(:disabled) { background: #3b7de8; }
+    .btn-activate:disabled { opacity: 0.5; cursor: not-allowed; }
   </style>
 </head>
 <body>
@@ -239,6 +320,12 @@
       <h1>Looker Studio Exporter</h1>
       <p>Export chart data as CSV</p>
     </div>
+  </div>
+
+  <!-- Usage badge -->
+  <div class="usage-badge" id="usageBadge">
+    3 free exports left this month
+    <span class="upgrade-link" onclick="showPaywall()">Upgrade</span>
   </div>
 
   <div class="status-bar">
@@ -271,6 +358,46 @@
 
   <div class="toast" id="toast"></div>
 
+  <!-- Paywall overlay -->
+  <div class="overlay" id="paywallOverlay" style="position:fixed">
+    <div class="overlay-card" style="position:relative">
+      <span class="overlay-close" onclick="hidePaywall()">×</span>
+      <h2>You've used your 3 free exports</h2>
+      <p>Upgrade to Pro for unlimited exports every month.</p>
+      <div class="plan-row">
+        <div class="plan-opt" onclick="openCheckout('monthly')">
+          <div class="plan-opt-label">Monthly</div>
+          <div class="plan-opt-price">$5<span>/mo</span></div>
+        </div>
+        <div class="plan-opt" onclick="openCheckout('yearly')">
+          <div class="plan-opt-label">Yearly</div>
+          <div class="plan-opt-price">$29<span>/yr</span></div>
+          <div class="plan-opt-save">Save 52%</div>
+        </div>
+      </div>
+      <p class="overlay-footer">
+        Already have a key? <a onclick="showLicenseEntry()">Enter it here</a>
+      </p>
+    </div>
+  </div>
+
+  <!-- License entry overlay -->
+  <div class="overlay" id="licenseOverlay" style="position:fixed">
+    <div class="overlay-card" style="position:relative">
+      <span class="overlay-close" onclick="hideLicenseEntry()">×</span>
+      <h2>Enter License Key</h2>
+      <p>Paste the key from your confirmation email.</p>
+      <input class="license-input" id="licenseInput" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" />
+      <div class="license-error" id="licenseError"></div>
+      <button class="btn-activate" id="activateBtn" onclick="activateLicense()">Activate</button>
+    </div>
+  </div>
+
+  <script>
+    function openCheckout(plan) {
+      chrome.tabs.create({ url: `https://looker-exporter-checkout.vercel.app/?plan=${plan}` });
+    }
+  </script>
   <script src="src/popup.js"></script>
 </body>
 </html>
